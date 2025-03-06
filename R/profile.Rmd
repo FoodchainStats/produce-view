@@ -1,0 +1,199 @@
+---
+title: "Produce View"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+    toc_depth: 3
+date: "2025-03-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	results = "hide",
+	fig.width = 9,
+	fig.height = 7
+)
+
+library(aws.s3)
+library(nanoparquet)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(forcats)
+library(purrr)
+library(ukfsr)
+
+pv <- aws.s3::s3read_using(FUN = nanoparquet::read_parquet, object = "ProduceView/produce_view.parquet", bucket = "s3-ranch-045")
+pv <- pv |> mutate(date = ymd(date))
+
+```
+
+## What this is
+
+The data is a log of SKUs and country of origins available in a sample of
+supermarkets. The profiles are a summary of counts of these SKU records. No
+indication of volume of available product or sales is implied. Its assumed that
+diversity of SKUs implies more product on sale, but this is not necessarily the
+case. A homogeneous product may sell in great volume but only have a small
+number of records in the data.
+
+
+## Product profiles {.tabset .tabset-pills}
+
+### Categories
+
+```{r product-profile-cat}
+
+
+cats <- pv |> count(category) |> pull(category)
+
+purrr::map(cats, \(x) {
+  
+pv |> 
+  filter(!category %in% c("Mushrooms", "Prepared")) |> 
+  mutate(month = month(date),
+         country = fct(country)) |>
+  filter(!country %in% c("NA", "Non Shown"), !is.na(country), category == x) |> 
+  mutate(country = fct_lump_n(country, n = 4)) |> 
+  ggplot() +
+  geom_bar(aes(x = month, fill = country), position = "fill", stat = "count") + 
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_fill_manual(values = afcolours::af_colours(type = "categorical")) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(), legend.title = element_blank()) +
+  labs(title = x,
+       x = NULL,
+      y= NULL)
+})
+
+```
+
+
+### Sub categories
+
+```{r product-profile-subcat}
+
+
+cats <- pv |> count(sub_category) |> pull(sub_category)
+
+purrr::map(cats, \(x) {
+  
+pv |> 
+  mutate(month = month(date),
+         country = fct(country)) |>
+  filter(!country %in% c("NA", "Non Shown"), !is.na(country), sub_category == x) |> 
+  mutate(country = fct_lump_n(country, n = 4)) |> 
+  ggplot() +
+  geom_bar(aes(x = month, fill = country), position = "fill", stat = "count") + 
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_fill_manual(values = afcolours::af_colours(type = "categorical")) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(), legend.title = element_blank()) +
+  labs(title = x,
+       x = NULL,
+      y= NULL)
+})
+
+```
+
+### Product group
+
+```{r product-profile-prodgrp}
+
+
+cats <- pv |> count(product_group) |> pull(product_group)
+
+purrr::map(cats, \(x) {
+  
+pv |> 
+  mutate(month = month(date),
+         country = fct(country)) |>
+  filter(!country %in% c("NA", "Non Shown"), !is.na(country), product_group == x) |> 
+  mutate(country = fct_lump_n(country, n = 4)) |> 
+  ggplot() +
+  geom_bar(aes(x = month, fill = country), position = "fill", stat = "count") + 
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_fill_manual(values = afcolours::af_colours(type = "categorical")) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(), legend.title = element_blank()) +
+  labs(title = x,
+       x = NULL,
+      y= NULL)
+})
+
+```
+
+## Country profiles {.tabset .tabset-pills}
+
+### Sub categories
+
+```{r country-profile-subcat}
+
+countries <- pv |> count(country) |> pull(country)
+
+purrr::map(countries, \(x) {
+
+  pv |> 
+  mutate(month = month(date),
+         sub_category = fct(sub_category)) |>
+  filter(!country %in% c("NA", "Non Shown"), !is.na(country), country == x) |> 
+  mutate(sub_category = fct_lump_n(sub_category, n = 4)) |> 
+  ggplot() +
+  geom_bar(aes(x = month, fill = sub_category), position = "fill", stat = "count") +
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_x_continuous(limits = c(1, 12), breaks = 1:12, labels = month.abb) +
+  scale_fill_manual(values = afcolours::af_colours(type = "categorical")) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(), legend.title = element_blank()) +
+  labs(title = x,
+       x = NULL,
+       y= NULL)
+
+})
+  
+```
+
+
+### Product group
+  
+```{r country-profile-prodgrp}
+
+countries <- pv |> count(country) |> pull(country)
+
+purrr::map(countries, \(x) {
+
+  pv |> 
+  mutate(month = month(date),
+         product_group = fct(product_group)) |>
+  filter(!country %in% c("NA", "Non Shown"), !is.na(country), country == x) |> 
+  mutate(product_group = fct_lump_n(product_group, n = 4)) |> 
+  ggplot() +
+  geom_bar(aes(x = month, fill = product_group), position = "fill", stat = "count") +
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_x_continuous(limits = c(1, 12), breaks = 1:12, labels = month.abb) +
+  scale_fill_manual(values = afcolours::af_colours(type = "categorical")) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(), legend.title = element_blank()) +
+  labs(title = x,
+       x = NULL,
+       y= NULL)
+
+})
+  
+```
+
+
+
+
