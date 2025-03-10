@@ -28,7 +28,14 @@ library(purrr)
 library(ukfsr)
 
 pv <- aws.s3::s3read_using(FUN = nanoparquet::read_parquet, object = "ProduceView/produce_view.parquet", bucket = "s3-ranch-045")
-pv <- pv |> mutate(date = ymd(date))
+pv <- pv |> 
+  mutate(date = ymd(date),
+                   country = case_when(country == "United States Of America" ~ "USA", 
+                             .default = country)) |> 
+  filter(!country %in% c("NA", "Non Shown"))
+
+
+
 
 ```
 
@@ -48,13 +55,17 @@ number of records in the data.
 
 ```{r product-profile-cat}
 
+pv_cats <- pv |> 
+  count(category) |> 
+  filter(n >= 400) |> 
+  left_join(pv, by = join_by(category == category))
 
-cats <- pv |> count(category) |> pull(category)
+
+cats <- pv_cats |> count(category) |> pull(category)
 
 purrr::map(cats, \(x) {
   
-pv |> 
-  filter(!category %in% c("Mushrooms", "Prepared")) |> 
+pv_cats |> 
   mutate(month = month(date),
          country = fct(country)) |>
   filter(!country %in% c("NA", "Non Shown"), !is.na(country), category == x) |> 
@@ -79,12 +90,16 @@ pv |>
 
 ```{r product-profile-subcat}
 
+pv_subcats <- pv |> 
+  count(sub_category) |> 
+  filter(n >= 400) |> 
+  left_join(pv, by = join_by(sub_category == sub_category))
 
-cats <- pv |> count(sub_category) |> pull(sub_category)
+cats <- pv_subcats |> count(sub_category) |> pull(sub_category)
 
 purrr::map(cats, \(x) {
   
-pv |> 
+pv_subcats |> 
   mutate(month = month(date),
          country = fct(country)) |>
   filter(!country %in% c("NA", "Non Shown"), !is.na(country), sub_category == x) |> 
@@ -109,11 +124,16 @@ pv |>
 ```{r product-profile-prodgrp}
 
 
-cats <- pv |> count(product_group) |> pull(product_group)
+pv_prods <- pv |> 
+  count(product_group) |> 
+  filter(n >= 400) |> 
+  left_join(pv, by = join_by(product_group == product_group))
+
+cats <- pv_prods |> count(product_group) |> pull(product_group)
 
 purrr::map(cats, \(x) {
   
-pv |> 
+pv_prods |> 
   mutate(month = month(date),
          country = fct(country)) |>
   filter(!country %in% c("NA", "Non Shown"), !is.na(country), product_group == x) |> 
@@ -139,11 +159,16 @@ pv |>
 
 ```{r country-profile-subcat}
 
-countries <- pv |> count(country) |> pull(country)
+pv_countries <- pv |> 
+  count(country) |> 
+  filter(n >= 400) |> 
+  left_join(pv, by = join_by(country == country))
+
+countries <- pv_countries |> count(country) |> pull(country)
 
 purrr::map(countries, \(x) {
 
-  pv |> 
+  pv_countries |> 
   mutate(month = month(date),
          sub_category = fct(sub_category)) |>
   filter(!country %in% c("NA", "Non Shown"), !is.na(country), country == x) |> 
@@ -151,7 +176,7 @@ purrr::map(countries, \(x) {
   ggplot() +
   geom_bar(aes(x = month, fill = sub_category), position = "fill", stat = "count") +
   scale_y_continuous(labels = scales::label_percent()) +
-  scale_x_continuous(limits = c(1, 12), breaks = 1:12, labels = month.abb) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
   scale_fill_manual(values = afcolours::af_colours(type = "categorical")) +
   theme_minimal() +
   theme(panel.grid.minor = element_blank(),
@@ -169,11 +194,11 @@ purrr::map(countries, \(x) {
   
 ```{r country-profile-prodgrp}
 
-countries <- pv |> count(country) |> pull(country)
+countries <- pv_countries |> count(country) |> pull(country)
 
 purrr::map(countries, \(x) {
 
-  pv |> 
+  pv_countries |> 
   mutate(month = month(date),
          product_group = fct(product_group)) |>
   filter(!country %in% c("NA", "Non Shown"), !is.na(country), country == x) |> 
@@ -181,7 +206,7 @@ purrr::map(countries, \(x) {
   ggplot() +
   geom_bar(aes(x = month, fill = product_group), position = "fill", stat = "count") +
   scale_y_continuous(labels = scales::label_percent()) +
-  scale_x_continuous(limits = c(1, 12), breaks = 1:12, labels = month.abb) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
   scale_fill_manual(values = afcolours::af_colours(type = "categorical")) +
   theme_minimal() +
   theme(panel.grid.minor = element_blank(),
