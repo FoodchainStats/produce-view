@@ -1,0 +1,297 @@
+---
+title: "Produce View"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r global, include=FALSE}
+library(flexdashboard)
+library(aws.s3)
+library(nanoparquet)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(forcats)
+library(purrr)
+library(ukfsr)
+library(afcolours)
+
+pv <- aws.s3::s3read_using(FUN = nanoparquet::read_parquet, object = "ProduceView/produce_view.parquet", bucket = "s3-ranch-045")
+pv <- pv |> 
+  mutate(date = ymd(date),
+         country = case_when(country == "United States Of America" ~ "USA", 
+                             country == "Viet Nam" ~ "Vietnam",
+                             .default = country),
+         date01 = ymd(paste(year(date), month(date), "01", sep = "-")),
+         promo = case_when(on_promotion == 0 ~ "N",
+                           on_promotion == 1 ~ "Y")) |> 
+  filter(!country %in% c("NA", "Non Shown"))
+
+categories <- pv |> count(category) |> pull(category)
+sub_categories <- pv |> count(sub_category) |> pull(sub_category)
+product_groups <- pv |> count(product_group) |> pull(product_group)
+countries <- pv |> count(country) |> pull(country)
+
+```
+
+Product profiles 
+=======================================================================
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+
+
+selectInput("category", choices = categories, label = "Category:")
+selectInput("sub_category", choices = sub_categories, label = "Sub category:")
+selectInput("product_group", choices = product_groups, label = "Product group:")
+
+```
+
+
+Row {data-width=650}
+-----------------------------------------------------------------------
+
+### **Category: `r renderText(input$category)`**
+
+```{r}
+
+renderPlot({
+  pv |> 
+  mutate(month = month(date),
+         country = fct(country)) |>
+  filter(!country %in% c("NA", "Non Shown"), !is.na(country), category == input$category) |> 
+  mutate(country = fct_lump_n(country, n = 4)) |> 
+  ggplot() +
+  geom_bar(aes(x = month, fill = country), position = "fill", stat = "count") + 
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_fill_manual(values = afcolours::af_colours(type = "categorical")) +
+  theme_minimal(base_size = 18) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(), legend.title = element_blank()) +
+  labs(title = NULL,
+       x = NULL,
+       y= NULL)
+})
+
+
+```
+
+
+Row {data-width=650}
+-----------------------------------------------------------------------
+
+### **Sub category: `r renderText(input$sub_category)`**
+
+```{r}
+
+renderPlot({
+  
+  pv |> 
+  mutate(month = month(date),
+         country = fct(country)) |>
+  filter(!country %in% c("NA", "Non Shown"), !is.na(country), sub_category == input$sub_category) |> 
+  mutate(country = fct_lump_n(country, n = 4)) |> 
+  ggplot() +
+  geom_bar(aes(x = month, fill = country), position = "fill", stat = "count") + 
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_fill_manual(values = afcolours::af_colours(type = "categorical")) +
+  theme_minimal(base_size = 18) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(), legend.title = element_blank()) +
+  labs(title = NULL,
+       x = NULL,
+      y= NULL)
+  
+})
+
+```
+
+
+Row {data-width=650}
+-----------------------------------------------------------------------
+
+### **Product group: `r renderText(input$product_group)`**
+
+```{r}
+
+renderPlot({
+  
+  pv |> 
+  mutate(month = month(date),
+         country = fct(country)) |>
+  filter(!country %in% c("NA", "Non Shown"), !is.na(country), product_group == input$product_group) |> 
+  mutate(country = fct_lump_n(country, n = 4)) |> 
+  ggplot() +
+  geom_bar(aes(x = month, fill = country), position = "fill", stat = "count") + 
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_fill_manual(values = afcolours::af_colours(type = "categorical")) +
+  theme_minimal(base_size = 18) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(), legend.title = element_blank()) +
+  labs(title = NULL,
+       x = NULL,
+       y= NULL)
+  
+})
+
+```
+
+
+Countries
+=======================================================================
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+
+selectInput("country", choices = countries, label = "Country:")
+
+```
+
+Row {data-width=350}
+-----------------------------------------------------------------------
+
+### **Sub category: `r renderText(input$country)`**
+
+```{r}
+renderPlot({
+  
+  pv |> 
+  mutate(month = month(date),
+         sub_category = fct(sub_category)) |>
+  filter(!country %in% c("NA", "Non Shown"), !is.na(country), country == input$country) |> 
+  mutate(sub_category = fct_lump_n(sub_category, n = 4)) |> 
+  ggplot() +
+  geom_bar(aes(x = month, fill = sub_category), position = "fill", stat = "count") +
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_fill_manual(values = afcolours::af_colours(type = "categorical")) +
+  theme_minimal(base_size = 18) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(), legend.title = element_blank()) +
+  labs(title = NULL,
+       x = NULL,
+       y= NULL)
+
+})
+
+```
+
+
+Row {data-width=350}
+-----------------------------------------------------------------------
+
+### **Product group: `r renderText(input$country)`**
+
+```{r}
+renderPlot({
+  
+  pv |> 
+  mutate(month = month(date),
+         product_group = fct(product_group)) |>
+  filter(!country %in% c("NA", "Non Shown"), !is.na(country), country == input$country) |> 
+  mutate(product_group = fct_lump_n(product_group, n = 4)) |> 
+  ggplot() +
+  geom_bar(aes(x = month, fill = product_group), position = "fill", stat = "count") +
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_fill_manual(values = afcolours::af_colours(type = "categorical")) +
+  theme_minimal(base_size = 18) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(), legend.title = element_blank()) +
+  labs(title = NULL,
+       x = NULL,
+       y= NULL)
+
+})
+
+```
+
+
+Prices
+=======================================================================
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+
+selectInput("price_product_group", choices = product_groups, label = "Product group:")
+
+```
+
+
+Row {data-width=350}
+-----------------------------------------------------------------------
+
+### **`r renderText(input$price_product_group)` sold by weight**
+
+```{r}
+
+renderPlot({
+  
+  pv |> 
+  mutate(mth = ymd(paste(year(date), month(date), "01", sep = "-")),
+         promo = case_when(on_promotion == 0 ~ "N",
+                           on_promotion == 1 ~ "Y")) |> 
+  filter(product_group == input$price_product_group, pack_unit == "g") |> 
+  group_by(mth, promo) |> 
+  summarise(avg_price = mean(price_per_kg)) |> 
+  ggplot() +
+  geom_point(aes(x = mth, y = avg_price, colour = promo)) +
+  geom_line(aes(x = mth, y = avg_price, colour = promo)) +
+  scale_colour_manual(values = af_colours(type = "duo")) +
+  theme_minimal(base_size = 18) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  labs(title = NULL,
+       x = NULL,
+       y= "Price (£\\kg)",
+       colour = "Promotion")
+  
+})
+
+```
+
+
+Row {data-width=350}
+-----------------------------------------------------------------------
+
+### **`r renderText(input$price_product_group)` sold by unit**
+
+```{r}
+
+renderPlot({
+  
+  pv |> 
+  mutate(mth = ymd(paste(year(date), month(date), "01", sep = "-")),
+         promo = case_when(on_promotion == 0 ~ "N",
+                           on_promotion == 1 ~ "Y")) |> 
+  filter(product_group == input$price_product_group, pack_unit == "Each") |> 
+  group_by(mth, promo) |> 
+  summarise(avg_price = mean(price_each)) |> 
+  ggplot() +
+  geom_point(aes(x = mth, y = avg_price, colour = promo)) +
+  geom_line(aes(x = mth, y = avg_price, colour = promo)) +
+  scale_colour_manual(values = af_colours(type = "duo")) +
+  theme_minimal(base_size = 18) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  labs(title = NULL,
+       x = NULL,
+       y= "Price per unit (£)",
+       colour = "Promotion")
+  
+})
+
+```
+
