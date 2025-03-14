@@ -28,7 +28,7 @@ pv <- pv |>
          date01 = ymd(paste(year(date), month(date), "01", sep = "-")),
          promo = case_when(on_promotion == 0 ~ "N",
                            on_promotion == 1 ~ "Y")) |> 
-  filter(!country %in% c("NA", "Non Shown"))
+  filter(!country %in% c("NA", "Non Shown", "-- NA --"))
 
 categories <- pv |> count(category) |> pull(category)
 sub_categories <- pv |> count(sub_category) |> pull(sub_category)
