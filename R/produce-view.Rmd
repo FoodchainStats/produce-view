@@ -18,6 +18,7 @@ library(forcats)
 library(purrr)
 library(ukfsr)
 library(afcolours)
+library(readxl)
 
 pv <- aws.s3::s3read_using(FUN = nanoparquet::read_parquet, object = "ProduceView/produce_view.parquet", bucket = "s3-ranch-045")
 pv <- pv |> 
@@ -34,6 +35,23 @@ categories <- pv |> count(category) |> pull(category)
 sub_categories <- pv |> count(sub_category) |> pull(sub_category)
 product_groups <- pv |> count(product_group) |> pull(product_group)
 countries <- pv |> count(country) |> pull(country)
+
+skus <- pv |> 
+  dplyr::filter(date >= "2024-01-01", promo_details == "-- NA --") |> 
+  dplyr::group_by(date, store, product_group, fullname) |> 
+  dplyr::summarise(tot = n()) |> 
+  dplyr::group_by(date, store, product_group) |> 
+  dplyr::summarise(skus = n()) 
+
+oos <- aws.s3::s3read_using(FUN = readxl::read_xlsx, object = "ProduceView/availability2024.xlsx", bucket = "s3-ranch-045") |> 
+  dplyr::group_by(date, retailer, store, product_group) |> 
+  dplyr::summarise(oos = sum(standard_price_products))
+
+
+pa <- skus |> 
+  dplyr::left_join(oos) |> 
+  dplyr::mutate(pc_oos =dplyr::case_when(is.na(oos) ~ 0,
+                                         .default = (oos/(oos+skus)) *100))
 
 ```
 
@@ -293,5 +311,68 @@ renderPlot({
   
 })
 
+```
+
+Product Range Availability
+================================================================================
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+
+selectInput("pa_product_group", choices = product_groups, label = "Product group:")
+checkboxInput("pa_date", label = "Show time series:", value = FALSE)
+
+```
+
+
+Row {data-width=350}
+-----------------------------------------------------------------------
+
+### **`r renderText(input$pa_product_group)`**
+
+```{r}
+
+renderPlot({
+  
+  if(!input$pa_date) {
+  
+  pa |> 
+  dplyr::mutate(month = month(date), pc_pa = 100 - pc_oos) |> 
+  dplyr::filter(product_group == input$pa_product_group) |> 
+  dplyr::group_by(month) |> 
+  dplyr::summarise(avg_oos = mean(pc_oos),
+                   avg_pa = mean(pc_pa)) |> 
+  ggplot2::ggplot() +
+  ggplot2::geom_col(aes(x = month, y = avg_pa),fill = af_colours()[1]) +
+  scale_y_continuous(labels = scales::label_percent(scale = 1)) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  theme_minimal(base_size = 18) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(), legend.title = element_blank()) +
+  labs(title = NULL,
+       x = NULL,
+       y= NULL)
+    
+  } else {
+    
+    pa |> 
+  dplyr::mutate(month = month(date), pc_pa = 100 - pc_oos) |> 
+  dplyr::filter(product_group == input$pa_product_group) |> 
+  dplyr::group_by(date) |> 
+  dplyr::summarise(avg_oos = mean(pc_oos),
+                   avg_pa = mean(pc_pa)) |> 
+  ggplot2::ggplot() +
+  ggplot2::geom_line(aes(x = date, y = avg_pa),colour = af_colours()[1]) +
+  scale_y_continuous(labels = scales::label_percent(scale = 1), limits = c(0,100)) +
+  theme_minimal(base_size = 18) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(), legend.title = element_blank()) +
+  labs(title = NULL,
+       x = NULL,
+       y= NULL)  
+  }
+})
 ```
 
