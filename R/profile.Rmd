@@ -25,7 +25,8 @@ library(lubridate)
 library(ggplot2)
 library(forcats)
 library(purrr)
-library(ukfsr)
+# library(ukfsr)
+library(aws.ec2metadata)
 
 pv <- aws.s3::s3read_using(FUN = nanoparquet::read_parquet, object = "ProduceView/produce_view.parquet", bucket = "s3-ranch-045")
 pv <- pv |> 

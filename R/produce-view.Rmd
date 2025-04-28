@@ -16,9 +16,10 @@ library(lubridate)
 library(ggplot2)
 library(forcats)
 library(purrr)
-library(ukfsr)
+# library(ukfsr)
 library(afcolours)
 library(readxl)
+library(aws.ec2metadata) 
 
 pv <- aws.s3::s3read_using(FUN = nanoparquet::read_parquet, object = "ProduceView/produce_view.parquet", bucket = "s3-ranch-045")
 pv <- pv |> 
@@ -38,10 +39,10 @@ countries <- pv |> count(country) |> pull(country)
 
 skus <- pv |> 
   dplyr::filter(date >= "2024-01-01", promo_details == "-- NA --") |> 
-  dplyr::group_by(date, store, product_group, fullname) |> 
-  dplyr::summarise(tot = n()) |> 
-  dplyr::group_by(date, store, product_group) |> 
-  dplyr::summarise(skus = n()) 
+  dplyr::group_by(date, store, product_group, fullname) |>
+  dplyr::summarise(tot = n()) |>
+  dplyr::group_by(date, store, product_group) |>
+  dplyr::summarise(skus = n())
 
 oos <- aws.s3::s3read_using(FUN = readxl::read_xlsx, object = "ProduceView/availability2024.xlsx", bucket = "s3-ranch-045") |> 
   dplyr::group_by(date, retailer, store, product_group) |> 
@@ -52,6 +53,12 @@ pa <- skus |>
   dplyr::left_join(oos) |> 
   dplyr::mutate(pc_oos =dplyr::case_when(is.na(oos) ~ 0,
                                          .default = (oos/(oos+skus)) *100))
+
+ranges <- pv |> 
+    dplyr::group_by(date, retailer, store, store_category, category, sub_category, product_group, fullname) |> 
+  dplyr::summarise(tot = n()) |> 
+  dplyr::group_by(date, retailer, store, store_category, category, sub_category, product_group) |> 
+  dplyr::summarise(skus = n()) 
 
 ```
 
@@ -374,5 +381,42 @@ renderPlot({
        y= NULL)  
   }
 })
+```
+
+
+Testing
+================================================================================
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+
+selectInput("lines", choices = sub_categories, label = "select:")
+
+```
+
+Row {data-width=350}
+-----------------------------------------------------------------------
+
+### **`r renderText(input$lines)`**
+
+```{r}
+
+renderPlot({
+  
+  
+  ranges |> 
+  group_by(date, store_category, retailer, store, sub_category) |> 
+  summarise(lines = sum(skus)) |> 
+  group_by(date, store_category, retailer, sub_category) |> 
+  summarise(lines = mean(lines)) |> 
+  filter(store_category == "Standard", sub_category == input$lines) |>
+  ggplot() +
+  geom_line(aes(x = date, y = lines)) +
+  facet_wrap(vars(retailer))
+  
+})
+
 ```
 
