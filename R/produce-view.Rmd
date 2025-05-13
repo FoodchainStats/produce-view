@@ -61,6 +61,53 @@ ranges <- pv |>
   dplyr::summarise(skus = n()) 
 
 ```
+About
+=======================================================================
+
+**What is this?** 
+
+The raw Produce View dataset contains one record for each individual SKU on sale
+at the time of sampling, including details of the store, product price and
+country of origin. See below for some random example records.
+
+#### Profiles
+
+The product profiles are produced by calculating the proportion of unique SKUs
+by country (or product). **Note that there is no measure of volume in the data** -
+the assumption is that the range of products available increases as availability
+does, ie products are in season. For products that are very homogenous this
+might not be visible.
+
+
+####  Calculating Availability
+
+BGI have changed the way in which they collect availability/out of stock data.
+Their data collectors confirm which product groups have out of stock items.
+
+The numbers in the columns indicate how many products in any one product group
+were out of stock in that week, and whether it is a product which is currently
+on promotion or not. For example, in the below data, there were 2 standard price
+raspberry SKUs out of stock, 1 pomegranate SKU on promotion out of stock, and 1
+standard price oranges SKU out of stock.
+
+![](/home/davidlee/work/produce-view/www/outofstock.png)
+
+
+In the prices dataset we group by date, store and product group, then count the
+unique product names (ignoring variety and country). So with the Waitrose
+raspberries there are 3 unique lines with prices (see below). From the
+availability data we know that there were also 2 out of stock SKUs therefore
+range availability on that day was 3/(3+2) = 60%.
+
+![](/home/davidlee/work/produce-view/www/instock.png)
+
+#### Example of raw data
+
+```{r}
+pv |> slice_sample(n = 4) |> t() |> knitr::kable()
+```
+
+
 
 Product profiles 
 =======================================================================
@@ -121,7 +168,7 @@ renderPlot({
   mutate(month = month(date),
          country = fct(country)) |>
   filter(!country %in% c("NA", "Non Shown"), !is.na(country), sub_category == input$sub_category) |> 
-  mutate(country = fct_lump_n(country, n = 4)) |> 
+  mutate(country = fct_lump_n(country, n = 5)) |> 
   ggplot() +
   geom_bar(aes(x = month, fill = country), position = "fill", stat = "count") + 
   scale_y_continuous(labels = scales::label_percent()) +
