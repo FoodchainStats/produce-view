@@ -61,6 +61,12 @@ ranges <- pv |>
   dplyr::group_by(date, retailer, store, store_category, category, sub_category, product_group) |> 
   dplyr::summarise(skus = n()) 
 
+downloadButtonRmd <- function (outputId, label = "Download", class = NULL, ...)  {
+     tags$a(id = outputId, class = paste("btn btn-default shiny-download-link", 
+        class), href = "", target = "_blank", download = NA, 
+        icon("download"), label, ...)
+ }
+
 ```
 About
 =======================================================================
@@ -121,6 +127,10 @@ Inputs {.sidebar}
 selectInput("cat_category", choices = sub_categories, label = "Category:")
 numericInput("cat_numcats", min = 1, max = 5, step = 1,value = 4, label = "Number of categories:")
 
+downloadButtonRmd("download_category", "Profile data")
+p()
+downloadButtonRmd("download_category_uk", "UK Profile data")
+
 ```
 
 
@@ -151,9 +161,25 @@ renderPlot({
   labs(title = NULL,
        x = NULL,
       y= NULL)
-  
 })
 
+
+download_cat <- reactive({
+  pv |> 
+  mutate(month = month(date),
+         country = fct(country)) |>
+  filter(!country %in% c("NA", "Non Shown"), !is.na(country), sub_category == input$cat_category) |> 
+  group_by(month,country) |> 
+  summarise(n = n()) |> 
+  mutate(pct = n/sum(n), product = input$cat_category)
+})
+
+output$download_category <- downloadHandler(filename = function() { 
+    return(paste("data-", format(Sys.time(), "%Y-%m-%d-%H%M%S"), ".csv", sep=""))
+
+ }, content = function(file) {
+   write.csv(download_cat(), file, row.names = FALSE)
+ })
 ```
 
 Row {data-width=650}
@@ -162,14 +188,20 @@ Row {data-width=650}
 ### **UK profile: `r renderText(input$cat_category)`**
 
 ```{r}
-renderPlot({  pv |> 
+
+uk_profile_cat <- reactive({
+  pv |> 
   mutate(month = month(date),
          country = fct(country)) |>
   filter(!country %in% c("NA", "Non Shown"), !is.na(country), sub_category == input$cat_category, country == "United Kingdom") |> 
   group_by(month) |> 
   count() |> 
   ungroup() |> 
-  mutate(pc = n/sum(n)) |> 
+  mutate(pc = n/sum(n))
+})
+
+renderPlot({ 
+  uk_profile_cat() |> 
   ggplot() + 
     geom_col(aes(x = month, y= pc), fill = af_colours()[1]) +
     geom_text(aes(x = month, y= pc, label = paste0(round(pc*100,0),"%")), vjust = -0.5) +
@@ -186,7 +218,12 @@ renderPlot({  pv |>
   
 })
 
+output$download_category_uk <- downloadHandler(filename = function() { 
+    return(paste("data-", format(Sys.time(), "%Y-%m-%d-%H%M%S"), ".csv", sep=""))
 
+ }, content = function(file) {
+   write.csv(uk_profile_cat() |> mutate(product = input$cat_category), file, row.names = FALSE)
+ })
 ```
 
 
@@ -203,6 +240,10 @@ Inputs {.sidebar}
 selectInput("prod_product", choices = product_groups, label = "Product:")
 numericInput("prod_numcats", min = 1, max = 5, step = 1,value = 4, label = "Number of categories:")
 
+downloadButtonRmd("download_product", "Profile data")
+p()
+downloadButtonRmd("download_product_uk", "UK Profile data")
+
 ```
 
 Row {data-width=650}
@@ -212,8 +253,6 @@ Row {data-width=650}
 
 ```{r}
 
-
-  
 renderPlot({  pv |> 
   mutate(month = month(date),
          country = fct(country)) |>
@@ -230,9 +269,24 @@ renderPlot({  pv |>
   labs(title = NULL,
        x = NULL,
        y= NULL)
-  
+  })
+
+download_prod <- reactive({
+  pv |> 
+    mutate(month = month(date),
+         country = fct(country)) |>
+  filter(!country %in% c("NA", "Non Shown"), !is.na(country), product_group == input$prod_product) |> 
+      group_by(month,country) |> 
+  summarise(n = n()) |> 
+  mutate(pct = n/sum(n), product = input$prod_product)
 })
 
+output$download_product <- downloadHandler(filename = function() { 
+    return(paste("data-", format(Sys.time(), "%Y-%m-%d-%H%M%S"), ".csv", sep=""))
+
+ }, content = function(file) {
+   write.csv(download_prod(), file, row.names = FALSE)
+ })
 ```
 
 Row {data-width=650}
@@ -241,6 +295,19 @@ Row {data-width=650}
 ### **UK profile: `r renderText(input$prod_product)`**
 
 ```{r}
+
+uk_profile_prod <- reactive({
+  pv |> 
+  mutate(month = month(date),
+         country = fct(country)) |>
+  filter(!country %in% c("NA", "Non Shown"), !is.na(country), product_group == input$prod_product, country == "United Kingdom") |> 
+  group_by(month) |> 
+  count() |> 
+  ungroup() |> 
+  mutate(pc = n/sum(n))
+})
+
+
 renderPlot({  pv |> 
   mutate(month = month(date),
          country = fct(country)) |>
@@ -265,6 +332,13 @@ renderPlot({  pv |>
   
 })
 
+
+output$download_product_uk <- downloadHandler(filename = function() { 
+    return(paste("data-", format(Sys.time(), "%Y-%m-%d-%H%M%S"), ".csv", sep=""))
+
+ }, content = function(file) {
+   write.csv(uk_profile_prod() |> mutate(product = input$prod_product), file, row.names = FALSE)
+ })
 
 ```
 
